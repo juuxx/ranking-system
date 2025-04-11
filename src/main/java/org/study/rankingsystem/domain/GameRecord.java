@@ -12,8 +12,10 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "game_record")
@@ -29,7 +31,16 @@ public class GameRecord {
 	@JoinColumn(name = "user_id")
 	private User user;
 
+	@Setter
 	private int totalScore;
 
+	@Setter
 	private LocalDateTime lastPlayedAt;
+
+	@Builder
+	public GameRecord(User user, int totalScore, LocalDateTime lastPlayedAt) {
+		this.user = user;
+		this.totalScore = totalScore;
+		this.lastPlayedAt = lastPlayedAt;
+	}
 }

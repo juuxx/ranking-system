@@ -11,6 +11,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -29,4 +30,11 @@ public class GameRecordLogs {
 
 	private int score;
 	private LocalDateTime playedAt;
+
+	@Builder
+	public GameRecordLogs(User user, int score, LocalDateTime playedAt) {
+		this.user = user;
+		this.score = score;
+		this.playedAt = playedAt;
+	}
 }

@@ -1,0 +1,24 @@
+version: '3'
+services:
+  mysql-docker:
+    image: mysql:8.0
+    platform: linux/amd64
+    environment:
+      MYSQL_DATABASE: 'insight'
+      MYSQL_ROOT_PASSWORD: '1234'
+      TZ: Asia/Seoul
+    container_name: 'insight-mysql'
+    ports:
+      - '3306:3306'
+    volumes:
+      - ./docker/mysql:/var/lib/mysql
+
+  redis-docker:
+    image: redis:latest
+    platform: linux/amd64
+    container_name: 'insight-redis'
+    command: redis-server --port 6379
+    ports:
+      - '6379:6379'
+    volumes:
+      - ./docker/data/redis:/data

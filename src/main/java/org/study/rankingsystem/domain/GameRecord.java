@@ -42,4 +42,8 @@ public class GameRecord {
 		this.totalScore = totalScore;
 		this.lastPlayedAt = lastPlayedAt;
 	}
+
+	public static GameRecord InitRecord(User user, LocalDateTime now) {
+		return new GameRecord(user, 0, now);
+	}
 }

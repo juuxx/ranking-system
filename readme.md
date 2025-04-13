@@ -1,53 +1,80 @@
-# 📊 Ranking System - Spring Boot + Redis + MySQL
+# System Insight 스터디
+## 📊 Ranking System - Spring Boot + Redis + MySQL
 
-> 실시간 게임 랭킹 시스템 구현 프로젝트
-
-이 프로젝트는 Redis ZSET을 활용하여 실시간 랭킹을 처리하고, MySQL에 사용자 및 게임 기록을 저장하는 토이 프로젝트입니다.
-사용자와 게임 기록은 API로 처리되며, 랭킹은 Redis를 통해 빠르게 조회됩니다.
-
----
-
-## ✅ 주요 기능
-
-### 1. 사용자 등록
-- 유저 ID, 닉네임, 프로필 이미지 등록
-- 더미 유저 100명 자동 생성 (`DummyUserLoader`)
-
-### 2. 게임 기록 저장 (API 예정)
-- 게임 점수 기록 (개별 플레이 이력 `GameRecordLog`)
-- 유저별 누적 점수, 마지막 플레이 시간 저장 (`GameRecord`)
-- 플레이할 때마다 Redis ZSET (`ranking:game:{날짜}`)에 점수 반영
-
-### 3. 랭킹 조회
-- Redis ZSET에서 상위 N명 조회 (`ZREVRANGE`)
-- 유저 프로필은 Redis Hash에서 TTL 관리
-- Redis 장애 시 DB fallback 처리
-
-### 4. 초기 더미 데이터
-- `user1 ~ user100` 자동 생성
-- 점수는 API를 통해 등록 (기록은 초기화되지 않음)
+- **목표**: 사용자 점수 기반으로 실시간 게임 랭킹 제공하는 시스템 구현
+- **기술 스택**: Spring Boot, JPA, Redis (ZSET, HASH), MySQL, Docker
+- **환경**: 스터디 기반 개인/소규모 환경 중심 (하지만 운영 확장 고려함)
 
 ---
 
-## ⚙️ 기술 스택
+## ✅ 주요 도메인 모델
 
-| 계층 | 기술 |
-|------|------|
-| 백엔드 | Spring Boot 3.x, JPA (Hibernate) |
-| 데이터베이스 | MySQL 8 |
-| 캐시 | Redis (ZSET + HASH) |
-| 배포 도구 | Docker + Docker Compose |
+### 1. User (사용자 정보)
+
+- userId, nickname, profileImageUrl, lastPlayed
+- 연관관계:
+    - `@OneToOne` → GameRecord (1:1, 최신 점수)
+    - `@OneToMany` → GameRecordLog (1\:N, 모든 플레이 기록)
+
+### 2. GameRecord (최신 누적 점수)
+
+- user, totalScore, lastPlayedAt
+
+### 3. GameRecordLog (플레이 로그)
+
+- user, score, playedAt
 
 ---
 
-## 🐳 Docker 실행 방법
+## ⚙️ 기능 흐름: 점수 등록 API
 
-```bash
-docker compose up -d
+### 📥 `POST /game/scores`
+
+#### 요청 JSON
+
+```json
+{
+  "nickname": "PlayerOne",
+  "userId": "khs",
+  "profileImageUrl": "https://cdn.example.com/images/player1.png",
+  "score": 150
+}
 ```
 
-- MySQL: `localhost:3306`
-- Redis: `localhost:6379`
+### 처리 단계
 
+1. User DB 등록 or 갱신
+2. GameRecordLog 저장 (이력)
+3. GameRecord 누적 점수 반영 (없으면 생성)
+4. Redis HASH 프로필 저장 (`user:profile:{userId}`)
+5. Redis ZSET 점수 반영 (`ranking:game:{yyyyMMdd}`)
 
+### TTL 전략
 
+- HASH: 30분 (Top 10 조회 시 1시간 연장)
+- ZSET: 1일 유지
+
+---
+
+## 📊 Top 10 랭킹 조회 API
+
+### 📤 `GET /game-rankings/top10`
+
+- ZSET에서 상위 10명 userId + score 조회
+- 각 userId에 대해:
+    - Redis HASH에서 프로필 조회
+    - 없으면 DB fallback → Redis 저장
+    - 있으면 TTL 1시간 연장
+- 응답: rank, nickname, profileImageUrl, totalScore, lastPlayedAt
+
+---
+
+## 🔁 수동 동기화 API (스터디/테스트용)
+
+### `POST /admin/ranking/sync`
+
+- DB의 GameRecord 기준 → Redis ZSET 재집계
+
+### `POST /admin/ranking/profile-sync`
+
+- DB의 User 기준 → Redis HASH 프로필 일괄 저장

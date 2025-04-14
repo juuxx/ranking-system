@@ -11,15 +11,13 @@ import java.util.Map;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 import org.study.rankingsystem.domain.GameRecord;
-import org.study.rankingsystem.domain.GameRecordLogs;
 import org.study.rankingsystem.domain.User;
 import org.study.rankingsystem.dto.AddScoreRequest;
 import org.study.rankingsystem.dto.AddedScoredResponse;
 import org.study.rankingsystem.dto.RankingTop10Response;
-import org.study.rankingsystem.infra.redis.service.RedisRankingService;
 import org.study.rankingsystem.infra.redis.dto.RedisUserProfile;
+import org.study.rankingsystem.infra.redis.service.RedisRankingService;
 import org.study.rankingsystem.infra.redis.service.RedisUserProfileService;
-import org.study.rankingsystem.repository.GameRecordLogsRepository;
 import org.study.rankingsystem.repository.GameRecordRepository;
 import org.study.rankingsystem.repository.UserRepository;
 
@@ -32,14 +30,12 @@ public class GameRecordService {
 
 	private final UserRepository userRepository;
 	private final GameRecordRepository gameRecordRepository;
-	private final GameRecordLogsRepository gameRecordLogsRepository;
 	private final RedisRankingService redisRankingService;
 	private final RedisUserProfileService redisUserProfileService;
-
+	private final AsyncGameRecordService asyncGameRecordService;
 
 	@Transactional
 	public AddedScoredResponse addScore(AddScoreRequest request) {
-
 		LocalDateTime now = LocalDateTime.now();
 		// 1. 점수 DB 저장
 		User user = userRepository.findByUserId(request.userId())
@@ -50,14 +46,7 @@ public class GameRecordService {
 
 		userRepository.save(user);
 
-		// 2. 게임 로그 저장
-		gameRecordLogsRepository.save(GameRecordLogs.builder()
-			.user(user)
-			.score(request.score())
-			.playedAt(now)
-			.build());
-
-		// 3. 총합 점수 갱신
+		// 2. 총합 점수 업데이트
 		GameRecord record = gameRecordRepository.findByUserId(user.getId())
 			.orElseGet(() -> GameRecord.InitRecord(user, now));
 
@@ -65,11 +54,11 @@ public class GameRecordService {
 		record.setLastPlayedAt(now);
 		gameRecordRepository.save(record);
 
+		// 비동기 호출
+		RedisUserProfile userProfile = getRedisUserProfile(user, now);
+		asyncGameRecordService.saveLogAsync(user, request.score(), now);
+		asyncGameRecordService.syncRedisAsync(request, userProfile);
 
-		this.saveRedisUserProfile(user, now);
-
-		// 5. Redis ZSET 점수 갱신
-		redisRankingService.updateUserScore(request);
 		return new AddedScoredResponse();
 	}
 
@@ -97,27 +86,30 @@ public class GameRecordService {
 			if (profile != null && score != null) {
 				result.add(
 					RankingTop10Response.RankingResponse.builder()
-					.rank(rank++)
-					.nickname(profile.getOrDefault("nickname", ""))
-					.profileImageUrl(profile.getOrDefault("profileImageUrl", ""))
-					.totalScore(score.intValue())
-					.lastPlayedAt(profile.getOrDefault("lastPlayedAt", ""))
-					.build()
+						.rank(rank++)
+						.nickname(profile.getOrDefault("nickname", ""))
+						.profileImageUrl(profile.getOrDefault("profileImageUrl", ""))
+						.totalScore(score.intValue())
+						.lastPlayedAt(profile.getOrDefault("lastPlayedAt", ""))
+						.build()
 				);
 			}
 		}
 		return new RankingTop10Response(result);
 	}
 
+	// 4. Redis 프로필 동기화
 	private void saveRedisUserProfile(User user, LocalDateTime now) {
-		RedisUserProfile userProfile = RedisUserProfile.builder()
+		RedisUserProfile userProfile = getRedisUserProfile(user, now);
+		redisUserProfileService.saveUserProfile(userProfile);
+	}
+
+	private static RedisUserProfile getRedisUserProfile(User user, LocalDateTime now) {
+		return RedisUserProfile.builder()
 			.userId(user.getUserId())
 			.nickname(user.getNickname())
 			.profileImageUrl(user.getNickname())
 			.lastPlayedAt(now)
 			.build();
-
-		// 4. Redis 프로필 동기화
-		redisUserProfileService.saveUserProfile(userProfile);
 	}
 }

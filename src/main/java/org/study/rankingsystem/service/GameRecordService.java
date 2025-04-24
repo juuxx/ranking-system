@@ -1,6 +1,5 @@
 package org.study.rankingsystem.service;
 
-import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -23,7 +22,9 @@ import org.study.rankingsystem.repository.UserRepository;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @RequiredArgsConstructor
 @Service
 public class GameRecordService {
@@ -33,6 +34,7 @@ public class GameRecordService {
 	private final RedisRankingService redisRankingService;
 	private final RedisUserProfileService redisUserProfileService;
 	private final AsyncGameRecordService asyncGameRecordService;
+
 
 	@Transactional
 	public AddedScoredResponse addScore(AddScoreRequest request) {
@@ -66,35 +68,45 @@ public class GameRecordService {
 		String key = "ranking:game:" + LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
 		List<ZSetOperations.TypedTuple<String>> topUsers = redisRankingService.getTopRankings(key, 10);
 
+		List<String> userIds = topUsers.stream()
+			.map(ZSetOperations.TypedTuple::getValue)
+			.toList();
+
+		Map<String, Map<String, String>> userProfiles = redisUserProfileService.getUserProfiles(userIds);
+
 		int rank = 1;
 		List<RankingTop10Response.RankingResponse> result = new ArrayList<>();
+
 		for (ZSetOperations.TypedTuple<String> userScore : topUsers) {
 			String userId = userScore.getValue();
 			Double score = userScore.getScore();
 
-			Map<String, String> profile = redisUserProfileService.getUserProfile(userId);
+			Map<String, String> profile = userProfiles.getOrDefault(userId, Map.of());
 
 			// fallback to DB if profile missing
 			if (profile.isEmpty()) {
 				userRepository.findByUserId(userId)
-					.ifPresent(user -> this.saveRedisUserProfile(user, user.getGameRecord().getLastPlayedAt()));
-				profile = redisUserProfileService.getUserProfile(userId); // 재시도
-			} else {
-				redisUserProfileService.extendTTL(userId, Duration.ofHours(1));
+					.ifPresent(user -> {
+						this.saveRedisUserProfile(user, user.getGameRecord().getLastPlayedAt());
+						// 갱신 후 다시 반영
+						profile.put("nickname", user.getNickname());
+						profile.put("profileImageUrl", user.getProfileImageUrl());
+						profile.put("lastPlayedAt", user.getGameRecord().getLastPlayedAt().toString());
+					});
 			}
 
-			if (profile != null && score != null) {
-				result.add(
-					RankingTop10Response.RankingResponse.builder()
-						.rank(rank++)
-						.nickname(profile.getOrDefault("nickname", ""))
-						.profileImageUrl(profile.getOrDefault("profileImageUrl", ""))
-						.totalScore(score.intValue())
-						.lastPlayedAt(profile.getOrDefault("lastPlayedAt", ""))
-						.build()
+			if (!profile.isEmpty() && score != null) {
+				result.add(RankingTop10Response.RankingResponse.builder()
+					.rank(rank++)
+					.nickname(profile.getOrDefault("nickname", ""))
+					.profileImageUrl(profile.getOrDefault("profileImageUrl", ""))
+					.totalScore(score.intValue())
+					.lastPlayedAt(profile.getOrDefault("lastPlayedAt", ""))
+					.build()
 				);
 			}
 		}
+
 		return new RankingTop10Response(result);
 	}
 
@@ -112,4 +124,6 @@ public class GameRecordService {
 			.lastPlayedAt(now)
 			.build();
 	}
+
+
 }

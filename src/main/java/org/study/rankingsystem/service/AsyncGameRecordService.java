@@ -41,7 +41,6 @@ public class AsyncGameRecordService {
 			// Redis ZSET 점수 갱신
 			redisRankingService.updateUserScore(request);
 		} catch (Exception e) {
-			// 로그로 남기기 (무시하면 추적 불가)
 			log.error("[Redis 비동기 처리 실패] userId={} | error={}", request.userId(), e.getMessage(), e);
 		}
 	}

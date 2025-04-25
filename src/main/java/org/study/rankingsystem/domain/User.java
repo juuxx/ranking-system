@@ -34,11 +34,11 @@ public class User {
 	// @Setter
 	private String profileImageUrl;
 
-	@OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
-	private GameRecord gameRecord;
-
-	@OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-	private List<GameRecordLogs> gameRecordLogs;
+//	@OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+//	private GameRecord gameRecord;
+//
+//	@OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+//	private List<GameRecordLogs> gameRecordLogs;
 
 	public void setNickname(String nickname) {
 		if (!ObjectUtils.isEmpty(nickname)) {

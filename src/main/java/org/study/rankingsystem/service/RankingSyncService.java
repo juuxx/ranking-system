@@ -11,7 +11,6 @@ import java.util.Optional;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.study.rankingsystem.domain.GameRecord;
-import org.study.rankingsystem.domain.User;
 import org.study.rankingsystem.infra.redis.dto.RedisUserProfile;
 import org.study.rankingsystem.repository.GameRecordRepository;
 import org.study.rankingsystem.repository.UserRepository;

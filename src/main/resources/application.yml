@@ -9,7 +9,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update  # ??? ??? validate ?? none ??
+      ddl-auto: update  # 실개발 전에는 validate 또는 none 추천
     show-sql: true
     properties:
       hibernate:
@@ -27,5 +27,10 @@ server:
 
 logging:
   level:
-    org.hibernate.SQL: debug
-    org.hibernate.type.descriptor.sql.BasicBinder: trace
+    root: INFO  # 기본은 INFO
+    org.study.rankingsystem: DEBUG  # 우리 프로젝트 패키지 전체
+    org.study.rankingsystem.infra.redis.service: DEBUG  # Redis 관련 로직만
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+
+

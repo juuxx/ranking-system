@@ -62,12 +62,6 @@ public class GameRecordService {
 		return rankingQueryStrategy.getTop10();
 	}
 
-	// 4. Redis 프로필 동기화
-	// private void saveRedisUserProfile(User user, LocalDateTime now) {
-	// 	RedisUserProfile userProfile = getRedisUserProfile(user, now);
-	// 	redisUserProfileService.saveUserProfile(userProfile);
-	// }
-
 	private static RedisUserProfile getRedisUserProfile(User user, LocalDateTime now) {
 		return RedisUserProfile.builder()
 			.userId(user.getUserId())
